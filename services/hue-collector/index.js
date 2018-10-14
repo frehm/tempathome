@@ -1,27 +1,18 @@
 const fetch = require('node-fetch');
-const config = {
-  bridgeIp: '',
-  userId: '',
-  sensors: [{
-    name: 'corridor',
-    id: 8,
-  }, {
-    name: 'hallway',
-    id: 12,
-  }, {
-    name: 'staircase',
-    id: 22,
-  }, {
-    name: 'basement',
-    id: 26,
-  }],
+const admin = require('firebase-admin');
+const schedule = require('node-schedule');
+const serviceAccount = require('C:\\dev\\service accounts\\tempathome-b77a7.json');
+
+const getConfig = async () => {
+  try {
+    const c = await admin.database().ref(`config/hue`).once('value');
+    return c.val();  
+  } catch (err) {
+    console.error('no config found', err);
+    return null;
+  }
 };
-/* response
- { ok: true,
-  temperature: 2027,
-  lastupdated: '2018-10-07T11:52:44',
-  battery: 94 }
-*/
+
 const getTemperature = async (bridgeIp, userId, sensorId) => {
   const url = `http://${bridgeIp}/api/${userId}/sensors/${sensorId}`;
   try {
@@ -49,35 +40,10 @@ const getTemperature = async (bridgeIp, userId, sensorId) => {
     };
   }
 };
-/* response
-values [ { name: 'corridor',
-    id: 8,
-    ok: true,
-    temperature: 2027,
-    lastupdated: '2018-10-07T12:07:43',
-    battery: 94 },
-  { name: 'hallway',
-    id: 12,
-    ok: true,
-    temperature: 2036,
-    lastupdated: '2018-10-07T12:08:25',
-    battery: 100 },
-  { name: 'staircase',
-    id: 22,
-    ok: true,
-    temperature: 1766,
-    lastupdated: '2018-10-07T12:09:31',
-    battery: 100 },
-  { name: 'basement',
-    id: 26,
-    ok: true,
-    temperature: 1859,
-    lastupdated: '2018-10-07T12:09:03',
-    battery: 100 } ]
-*/
-const pollTemperatures = async () => {
+
+const pollTemperatures = async config => {
   const values = [];
-  for (const sensor of config.sensors) {
+  for (const sensor of Object.values(config.sensors)) {
     const t = await getTemperature(config.bridgeIp, config.userId, sensor.id);
     if (t.ok) {
       values.push({
@@ -90,7 +56,7 @@ const pollTemperatures = async () => {
 };
 
 /* firebase structure
-sensors/{name}/{yyyy-mm-dd}/
+temperatures/{name}/{yyyy-mm-dd}/
   avg
   battery
   max
@@ -99,31 +65,18 @@ sensors/{name}/{yyyy-mm-dd}/
     {ts} value
 */
 
-// TODO: First read current values for day matching new value
-// Calculate new avg, max, min
-// Add battery and value to values
-// Update firebase
-
-//const createFirebaseUpdate = (values)
-// return object we can pass to firebase.update
-
-const readSensorDailyLog = (sensorName, day) => {
-  return {
-    avg: 20,
-    battery: 95,
-    min: 19,
-    max: 21,
-    values: {
-      '1538924852': 20,
-      '1538924553': 21,
-    },
-  };
+const readSensorDailyLog = async (sensorName, day) => {
+  try {
+    const snap = await admin.database().ref(`temperatures/${sensorName}/${day}`).once('value');
+    return snap.val();
+  } catch (err) {
+    return null;
+  }
 };
 
 const createUpdate = (sensorName, daily, values) => {
   // update daily log item with new value
   const updated = {
-    ...daily,
     battery: values.battery,
     values: {
       ...daily.values,
@@ -149,46 +102,59 @@ const createUpdate = (sensorName, daily, values) => {
     updated.max = 0;
   }
   
-  // TODO: Recalculate avg, min, max
-  // TODO: Create update object
-  //  'sensorName/yyyy-mm-dd/avg': 22
-  //  'sensorName/yyyy-mm-dd/values/1534545645': 21.23
-  // etc
-  console.log('updated', updated);
+  return updated;
+};
+
+const addNewTemperature = async sensorValues => {
+  const day = new Date(`${sensorValues.lastupdated}Z`).toISOString().slice(0, 10);
+  const dailyData = await readSensorDailyLog(sensorValues.name, day);
+  const updated = createUpdate(sensorValues.name, dailyData || {}, sensorValues);
+  const key = `temperatures/${sensorValues.name}/${day}`;
+  return {
+    [`${key}/avg`]: updated.avg,
+    [`${key}/battery`]: updated.battery,
+    [`${key}/max`]: updated.max,
+    [`${key}/min`]: updated.min,
+    [`${key}/values/${new Date(`${sensorValues.lastupdated}Z`).getTime()}`]: sensorValues.temperature / 100,
+  };
+};
+
+const poll = async () => {
+  console.log(`${new Date().toISOString()} polling...`);
+  const config = await getConfig();
+  console.time('poll bridge');
+  const temps = await pollTemperatures(config);
+  console.timeEnd('poll bridge');
+  let update = {};
+  console.time('update values');
+  for (const sensor of temps) {
+    const add = await addNewTemperature(sensor);
+    update = {
+      ...update,
+      ...add,
+    };
+  }
+  console.timeEnd('update values');
+  console.time('update firebase');
+  await admin.database().ref().update(update);
+  console.timeEnd('update firebase');
 };
 
 const main = async () => {
-  /*console.time('poll');
-  const values = await pollTemperatures();
-  console.timeEnd('poll');
-  console.log('values', values);*/
-  const test = [ { name: 'corridor',
-  id: 8,
-  ok: true,
-  temperature: 2027,
-  lastupdated: '2018-10-07T12:07:43',
-  battery: 94 },
-{ name: 'hallway',
-  id: 12,
-  ok: true,
-  temperature: 2036,
-  lastupdated: '2018-10-07T12:08:25',
-  battery: 100 },
-{ name: 'staircase',
-  id: 22,
-  ok: true,
-  temperature: 1766,
-  lastupdated: '2018-10-07T12:09:31',
-  battery: 100 },
-{ name: 'basement',
-  id: 26,
-  ok: true,
-  temperature: 1859,
-  lastupdated: '2018-10-07T12:09:03',
-  battery: 100 } ];
+  console.log('connecting to firebase');
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    databaseURL: "https://tempathome-b77a7.firebaseio.com"
+  });
+  console.log('initialized firebase');
 
-  createUpdate('test', readSensorDailyLog(), test[0]);
+  // every 5 minutes
+  const pollJob = schedule.scheduleJob('*/5 * * * *', poll);
 
+  process.on('SIGINT', () => {
+    pollJob.cancel();
+    process.exit(0);
+  });
 };
 
 main();

@@ -9,6 +9,7 @@
   "author": "Andreas Johansson",
   "license": "ISC",
   "dependencies": {
+    "firebase-admin": "^6.0.0",
     "node-fetch": "^2.2.0",
     "node-schedule": "^1.3.0"
   },
