@@ -1,7 +1,7 @@
 const fetch = require('node-fetch');
 const admin = require('firebase-admin');
 const schedule = require('node-schedule');
-const serviceAccount = require('C:\\dev\\service accounts\\tempathome-b77a7.json');
+const serviceAccount = require('C:\\development\\service accounts\\tempathome-b77a7.json');
 
 const getConfig = async () => {
   try {
@@ -116,6 +116,10 @@ const addNewTemperature = async sensorValues => {
     [`${key}/max`]: updated.max,
     [`${key}/min`]: updated.min,
     [`${key}/values/${new Date(`${sensorValues.lastupdated}Z`).getTime()}`]: sensorValues.temperature / 100,
+    [`temperature/${sensorValues.name}`]: {
+      time: new Date(`${sensorValues.lastupdated}Z`).toISOString(),
+      value: sensorValues.temperature / 100,
+    },
   };
 };
 
