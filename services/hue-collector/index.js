@@ -156,8 +156,11 @@ const main = async () => {
   const pollJob = schedule.scheduleJob('*/5 * * * *', poll);
 
   process.on('SIGINT', () => {
+    console.log('closing collector from SIGINT in 2 sec!');
     pollJob.cancel();
-    process.exit(0);
+    setTimeout(() => {
+      process.exit(0);
+    }, 2000);
   });
 };
 
