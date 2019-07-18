@@ -18,3 +18,5 @@ yarn-error.log*
 
 # log files from service wrapper
 /logs
+
+package-lock.json
