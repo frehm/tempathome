@@ -1,0 +1,47 @@
+{
+  "extends": "react-app",
+  "rules": {
+    "indent": [
+      "error",
+      2
+    ],
+    "linebreak-style": [
+      "error",
+      "windows"
+    ],
+    "quotes": [
+      "error",
+      "single"
+    ],
+    "semi": [
+      "error",
+      "always"
+    ],
+    "comma-dangle": [
+      "error",
+      "always-multiline"
+    ],
+    "object-curly-spacing": [
+      "error",
+      "always"
+    ],
+    "array-bracket-spacing": [
+      "error",
+      "never"
+    ],
+    "space-before-function-paren": [
+      "error",
+      {
+        "anonymous": "always",
+        "named": "never",
+        "asyncArrow": "always"
+      }
+    ],
+    "arrow-parens": [
+      "error",
+      "as-needed"
+    ],
+    "no-template-curly-in-string": "error",
+    "no-trailing-spaces": "error"
+  }
+}
