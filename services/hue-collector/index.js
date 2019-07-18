@@ -123,25 +123,36 @@ const addNewTemperature = async sensorValues => {
   };
 };
 
+let isPolling = false;
+
 const poll = async () => {
-  console.log(`${new Date().toISOString()} polling...`);
-  const config = await getConfig();
-  console.time('poll bridge');
-  const temps = await pollTemperatures(config);
-  console.timeEnd('poll bridge');
-  let update = {};
-  console.time('update values');
-  for (const sensor of temps) {
-    const add = await addNewTemperature(sensor);
-    update = {
-      ...update,
-      ...add,
-    };
+  if (isPolling) return;
+  isPolling = true;
+  try {
+    console.log(`${new Date().toISOString()} polling...`);
+    const config = await getConfig();
+    console.time('poll bridge');
+    const temps = await pollTemperatures(config);
+    console.timeEnd('poll bridge');
+    let update = {};
+    console.time('update values');
+    for (const sensor of temps) {
+      const add = await addNewTemperature(sensor);
+      update = {
+        ...update,
+        ...add,
+      };
+    }
+    console.timeEnd('update values');
+    console.time('update firebase');
+    await admin.database().ref().update(update);
+    console.timeEnd('update firebase');  
+  } catch (err) {
+    console.error('Polling failed', err.message);
   }
-  console.timeEnd('update values');
-  console.time('update firebase');
-  await admin.database().ref().update(update);
-  console.timeEnd('update firebase');
+  finally {
+    isPolling = false;
+  }
 };
 
 const main = async () => {
